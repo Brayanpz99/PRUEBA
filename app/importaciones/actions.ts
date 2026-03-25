@@ -268,4 +268,5 @@ export async function saveItemProductionAction(importId: string, itemId: string,
 
   await recalculateAndSnapshot(importId, `Producción actualizada para ítem ${item.itemCode}`)
   revalidatePath(`/importaciones/${importId}`)
+redirect(`/importaciones/${importId}`)
 }
