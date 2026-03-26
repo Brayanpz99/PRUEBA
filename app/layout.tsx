@@ -7,14 +7,19 @@ export const metadata: Metadata = {
   description: 'Control gerencial de costos de importación y producción',
 }
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body>
+      <body className="bg-slate-50">
         <div className="flex min-h-screen">
+          {/* SIDEBAR */}
           <Sidebar />
-          <main className="min-w-0 flex-1">
-            <div className="mx-auto max-w-7xl p-6 lg:p-10">{children}</div>
+
+          {/* CONTENIDO */}
+          <main className="flex-1">
+            <div className="h-full w-full px-6 py-6 lg:px-8 lg:py-8 xl:px-10">
+              {children}
+            </div>
           </main>
         </div>
       </body>

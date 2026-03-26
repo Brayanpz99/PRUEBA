@@ -1,23 +1,60 @@
 'use client'
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts'
 
-export function CostTrendChart({ data }: { data: Array<{ lotCode: string; adjustedRealUnitCost: number }> }) {
+type CostTrendChartProps = {
+  data: Array<{ lotCode: string; adjustedRealUnitCost: number }>
+}
+
+function currency(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(value)
+}
+
+export function CostTrendChart({ data }: CostTrendChartProps) {
   return (
-    <div className="h-80 w-full rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft h-[360px]">
       <div className="mb-4">
         <p className="text-sm font-medium text-slate-500">Evolución</p>
-        <h3 className="text-xl font-semibold text-slate-950">Costo real por lote</h3>
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+          Costo por unidad por lote
+        </h2>
       </div>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="lotCode" />
-          <YAxis />
-          <Tooltip formatter={(value: number) => `$${value.toFixed(4)}`} />
-          <Line type="monotone" dataKey="adjustedRealUnitCost" stroke="#0f172a" strokeWidth={3} dot />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+
+      <div className="h-[280px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 20, left: 10, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="lotCode" tick={{ fontSize: 12 }} />
+            <YAxis tick={{ fontSize: 12 }} />
+            <Tooltip
+              formatter={(value: number) => currency(value)}
+              contentStyle={{
+                borderRadius: 12,
+                border: '1px solid #e2e8f0',
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="adjustedRealUnitCost"
+              stroke="#1E293B"
+              strokeWidth={3}
+              dot={{ r: 4, fill: '#1E293B' }}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
   )
 }

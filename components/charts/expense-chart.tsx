@@ -1,26 +1,62 @@
 'use client'
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts'
 
-const colors = ['#0f172a', '#1e293b', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1']
+type ExpenseChartProps = {
+  data: Array<{ name: string; value: number }>
+}
 
-export function ExpenseChart({ data }: { data: Array<{ name: string; value: number }> }) {
+function currency(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(value)
+}
+
+export function ExpenseChart({ data }: ExpenseChartProps) {
   return (
-    <div className="h-80 w-full rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft h-[360px]">
       <div className="mb-4">
         <p className="text-sm font-medium text-slate-500">Distribución de gastos</p>
-        <h3 className="text-xl font-semibold text-slate-950">Por categoría</h3>
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+          Gastos por categoría (USD)
+        </h2>
       </div>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie data={data} dataKey="value" nameKey="name" innerRadius={65} outerRadius={100} paddingAngle={4}>
-            {data.map((entry, index) => (
-              <Cell key={entry.name} fill={colors[index % colors.length]} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
+
+      <div className="h-[280px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 8, right: 20, left: 10, bottom: 8 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis type="number" tick={{ fontSize: 12 }} />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={110}
+              tick={{ fontSize: 12 }}
+            />
+            <Tooltip
+              formatter={(value: number) => currency(value)}
+              contentStyle={{
+                borderRadius: 12,
+                border: '1px solid #e2e8f0',
+              }}
+            />
+            <Bar dataKey="value" radius={[0, 8, 8, 0]} fill="#1E293B" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
   )
 }
