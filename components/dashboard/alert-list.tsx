@@ -1,4 +1,4 @@
-type AlertItem = {
+export type AlertItem = {
   id: string
   title: string
   description: string

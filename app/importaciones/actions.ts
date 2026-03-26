@@ -1,6 +1,6 @@
 'use server'
 
-import { ProrationMethod } from '@prisma/client'
+import { ExpenseCategory, PaymentMethod, PaymentStatus, ProrationMethod } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
@@ -13,9 +13,16 @@ function parseNumber(value: FormDataEntryValue | null, fallback = 0) {
   return Number.isFinite(n) ? n : fallback
 }
 
-function parseOptionalDate(value: FormDataEntryValue | null) {
+function parseOptionalDate(value: FormDataEntryValue | null | string) {
   const raw = String(value ?? '').trim()
-  return raw ? new Date(raw) : null
+  if (!raw) return null
+
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Fecha inválida: ${raw}`)
+  }
+
+  return parsed
 }
 
 function parseOptionalString(value: FormDataEntryValue | null) {
@@ -104,6 +111,11 @@ function parseItems(formData: FormData) {
 
   if (!items.length) throw new Error('Debes registrar al menos un ítem válido.')
 
+  const uniqueCodes = new Set(items.map((item) => item.itemCode))
+  if (uniqueCodes.size !== items.length) {
+    throw new Error('Los códigos de ítem deben ser únicos dentro de la importación.')
+  }
+
   if (
     items.some(
       (item) =>
@@ -130,6 +142,10 @@ export async function createImportAction(formData: FormData) {
   const freightProrationMethod = String(
     formData.get('freightProrationMethod') || 'POR_VALOR'
   ) as ProrationMethod
+
+  if (!Object.values(ProrationMethod).includes(freightProrationMethod)) {
+    throw new Error('Método de prorrateo de flete inválido.')
+  }
 
   const daiNumber = parseOptionalString(formData.get('daiNumber'))
   const daiDate = parseOptionalDate(formData.get('daiDate'))
@@ -186,6 +202,10 @@ export async function updateImportAction(importId: string, formData: FormData) {
     formData.get('freightProrationMethod') || 'POR_VALOR'
   ) as ProrationMethod
 
+  if (!Object.values(ProrationMethod).includes(freightProrationMethod)) {
+    throw new Error('Método de prorrateo de flete inválido.')
+  }
+
   const daiNumber = parseOptionalString(formData.get('daiNumber'))
   const daiDate = parseOptionalDate(formData.get('daiDate'))
   const insurancePolicyNumber = parseOptionalString(formData.get('insurancePolicyNumber'))
@@ -237,16 +257,28 @@ export async function deleteImportAction(importId: string) {
 }
 
 export async function createExpenseAction(importId: string, formData: FormData) {
-  const category = String(formData.get('category') || 'OTROS') as never
+  const category = String(formData.get('category') || 'OTROS') as ExpenseCategory
   const description = String(formData.get('description') || '').trim()
   const amountUsd = parseNumber(formData.get('amountUsd'))
   const expenseDate = String(formData.get('expenseDate') || '').trim()
   const provider = String(formData.get('provider') || '').trim()
-  const paymentStatus = String(formData.get('paymentStatus') || 'PENDING') as never
+  const paymentStatus = String(formData.get('paymentStatus') || 'PENDING') as PaymentStatus
   const paymentMethodValue = String(formData.get('paymentMethod') || '').trim()
   const paymentDateValue = String(formData.get('paymentDate') || '').trim()
   const prorationMethod = String(formData.get('prorationMethod') || 'POR_VALOR') as ProrationMethod
   const manualJson = String(formData.get('manualAllocationsJson') || '').trim()
+
+  if (!Object.values(ExpenseCategory).includes(category)) {
+    throw new Error('Categoría de gasto inválida.')
+  }
+
+  if (!Object.values(PaymentStatus).includes(paymentStatus)) {
+    throw new Error('Estado de pago inválido.')
+  }
+
+  if (!Object.values(ProrationMethod).includes(prorationMethod)) {
+    throw new Error('Método de prorrateo inválido.')
+  }
 
   if (!description || !expenseDate || !provider) throw new Error('Completa los datos del gasto.')
   if (amountUsd < 0) throw new Error('Monto inválido.')
@@ -263,11 +295,15 @@ export async function createExpenseAction(importId: string, formData: FormData) 
         category,
         description,
         amountUsd,
-        expenseDate: new Date(expenseDate),
+        expenseDate: parseOptionalDate(expenseDate) ?? new Date(),
         provider,
         paymentStatus,
-        paymentMethod: paymentMethodValue ? (paymentMethodValue as never) : undefined,
-        paymentDate: paymentDateValue ? new Date(paymentDateValue) : undefined,
+        paymentMethod: paymentMethodValue
+          ? Object.values(PaymentMethod).includes(paymentMethodValue as PaymentMethod)
+            ? (paymentMethodValue as PaymentMethod)
+            : undefined
+          : undefined,
+        paymentDate: parseOptionalDate(paymentDateValue),
         prorationMethod,
       },
     })

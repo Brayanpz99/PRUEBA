@@ -93,7 +93,7 @@ export default async function DashboardPage() {
             severity: 'warning' as const,
           }
         : null,
-    ].filter(Boolean)
+    ].filter((alert): alert is Exclude<typeof alert, null> => alert !== null)
   })
 
   return (
