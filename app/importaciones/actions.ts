@@ -13,25 +13,68 @@ function parseNumber(value: FormDataEntryValue | null, fallback = 0) {
   return Number.isFinite(n) ? n : fallback
 }
 
-function allocationBase(item: { totalValueUsd: unknown; netWeightKg: unknown; grossWeightKg: unknown; quantity: unknown }, method: ProrationMethod) {
+function parseOptionalDate(value: FormDataEntryValue | null) {
+  const raw = String(value ?? '').trim()
+  return raw ? new Date(raw) : null
+}
+
+function parseOptionalString(value: FormDataEntryValue | null) {
+  const raw = String(value ?? '').trim()
+  return raw || null
+}
+
+function allocationBase(
+  item: {
+    totalValueUsd: unknown
+    netWeightKg: unknown
+    grossWeightKg: unknown
+    quantity: unknown
+  },
+  method: ProrationMethod
+) {
   if (method === 'POR_PESO_NETO') return Number(item.netWeightKg)
   if (method === 'POR_PESO_BRUTO') return Number(item.grossWeightKg)
   if (method === 'POR_CANTIDAD') return Number(item.quantity)
   return Number(item.totalValueUsd)
 }
 
-function buildAutoAllocations(items: Array<{ id: string; totalValueUsd: unknown; netWeightKg: unknown; grossWeightKg: unknown; quantity: unknown }>, amount: number, method: ProrationMethod) {
+function buildAutoAllocations(
+  items: Array<{
+    id: string
+    totalValueUsd: unknown
+    netWeightKg: unknown
+    grossWeightKg: unknown
+    quantity: unknown
+  }>,
+  amount: number,
+  method: ProrationMethod
+) {
   const basis = items.map((item) => ({ id: item.id, basis: allocationBase(item, method) }))
   const totalBasis = basis.reduce((sum, row) => sum + row.basis, 0)
   let accumulated = 0
+
   return basis.map((row, index) => {
     if (index === basis.length - 1) {
       const finalAmount = Number((amount - accumulated).toFixed(2))
-      return { importItemId: row.id, amountUsd: finalAmount, allocationPct: totalBasis > 0 ? Number((row.basis / totalBasis).toFixed(6)) : 0 }
+      return {
+        importItemId: row.id,
+        amountUsd: finalAmount,
+        allocationPct: totalBasis > 0 ? Number((row.basis / totalBasis).toFixed(6)) : 0,
+      }
     }
-    const allocation = totalBasis > 0 ? Number(((amount * row.basis) / totalBasis).toFixed(2)) : Number((amount / Math.max(items.length, 1)).toFixed(2))
+
+    const allocation =
+      totalBasis > 0
+        ? Number(((amount * row.basis) / totalBasis).toFixed(2))
+        : Number((amount / Math.max(items.length, 1)).toFixed(2))
+
     accumulated += allocation
-    return { importItemId: row.id, amountUsd: allocation, allocationPct: totalBasis > 0 ? Number((row.basis / totalBasis).toFixed(6)) : 0 }
+
+    return {
+      importItemId: row.id,
+      amountUsd: allocation,
+      allocationPct: totalBasis > 0 ? Number((row.basis / totalBasis).toFixed(6)) : 0,
+    }
   })
 }
 
@@ -60,7 +103,16 @@ function parseItems(formData: FormData) {
     .filter((item) => item.itemCode && item.description)
 
   if (!items.length) throw new Error('Debes registrar al menos un ítem válido.')
-  if (items.some((item) => item.quantity < 0 || item.unitPriceUsd < 0 || item.netWeightKg < 0 || item.grossWeightKg < 0)) {
+
+  if (
+    items.some(
+      (item) =>
+        item.quantity < 0 ||
+        item.unitPriceUsd < 0 ||
+        item.netWeightKg < 0 ||
+        item.grossWeightKg < 0
+    )
+  ) {
     throw new Error('No se permiten valores negativos en ítems.')
   }
 
@@ -75,9 +127,21 @@ export async function createImportAction(formData: FormData) {
   const notes = String(formData.get('notes') || '').trim() || null
   const currency = String(formData.get('currency') || 'USD').trim()
   const freightUsd = parseNumber(formData.get('freightUsd'))
-  const freightProrationMethod = String(formData.get('freightProrationMethod') || 'POR_VALOR') as ProrationMethod
+  const freightProrationMethod = String(
+    formData.get('freightProrationMethod') || 'POR_VALOR'
+  ) as ProrationMethod
 
-  if (!invoiceNumber || !supplier || !invoiceDate) throw new Error('Factura, proveedor y fecha son obligatorios.')
+  const daiNumber = parseOptionalString(formData.get('daiNumber'))
+  const daiDate = parseOptionalDate(formData.get('daiDate'))
+  const insurancePolicyNumber = parseOptionalString(formData.get('insurancePolicyNumber'))
+  const insuranceCompany = parseOptionalString(formData.get('insuranceCompany'))
+  const insuranceIssuedAt = parseOptionalDate(formData.get('insuranceIssuedAt'))
+  const insuranceExpiresAt = parseOptionalDate(formData.get('insuranceExpiresAt'))
+
+  if (!invoiceNumber || !supplier || !invoiceDate) {
+    throw new Error('Factura, proveedor y fecha son obligatorios.')
+  }
+
   if (freightUsd < 0) throw new Error('El flete no puede ser negativo.')
 
   const items = parseItems(formData)
@@ -93,7 +157,15 @@ export async function createImportAction(formData: FormData) {
       currency,
       freightUsd,
       freightProrationMethod,
-      items: { create: items },
+      daiNumber,
+      daiDate,
+      insurancePolicyNumber,
+      insuranceCompany,
+      insuranceIssuedAt,
+      insuranceExpiresAt,
+      items: {
+        create: items,
+      },
     },
   })
 
@@ -110,17 +182,47 @@ export async function updateImportAction(importId: string, formData: FormData) {
   const notes = String(formData.get('notes') || '').trim() || null
   const currency = String(formData.get('currency') || 'USD').trim()
   const freightUsd = parseNumber(formData.get('freightUsd'))
-  const freightProrationMethod = String(formData.get('freightProrationMethod') || 'POR_VALOR') as ProrationMethod
+  const freightProrationMethod = String(
+    formData.get('freightProrationMethod') || 'POR_VALOR'
+  ) as ProrationMethod
+
+  const daiNumber = parseOptionalString(formData.get('daiNumber'))
+  const daiDate = parseOptionalDate(formData.get('daiDate'))
+  const insurancePolicyNumber = parseOptionalString(formData.get('insurancePolicyNumber'))
+  const insuranceCompany = parseOptionalString(formData.get('insuranceCompany'))
+  const insuranceIssuedAt = parseOptionalDate(formData.get('insuranceIssuedAt'))
+  const insuranceExpiresAt = parseOptionalDate(formData.get('insuranceExpiresAt'))
 
   const items = parseItems(formData)
 
   await prisma.$transaction(async (tx) => {
     await tx.import.update({
       where: { id: importId },
-      data: { invoiceNumber, supplier, invoiceDate: new Date(invoiceDate), description, notes, currency, freightUsd, freightProrationMethod },
+      data: {
+        invoiceNumber,
+        supplier,
+        invoiceDate: new Date(invoiceDate),
+        description,
+        notes,
+        currency,
+        freightUsd,
+        freightProrationMethod,
+        daiNumber,
+        daiDate,
+        insurancePolicyNumber,
+        insuranceCompany,
+        insuranceIssuedAt,
+        insuranceExpiresAt,
+      },
     })
+
     await tx.importItem.deleteMany({ where: { importId } })
-    await tx.importItem.createMany({ data: items.map((item) => ({ ...item, importId })) })
+    await tx.importItem.createMany({
+      data: items.map((item) => ({
+        ...item,
+        importId,
+      })),
+    })
   })
 
   await recalculateAndSnapshot(importId, 'Edición de cabecera/ítems')
@@ -149,7 +251,10 @@ export async function createExpenseAction(importId: string, formData: FormData) 
   if (!description || !expenseDate || !provider) throw new Error('Completa los datos del gasto.')
   if (amountUsd < 0) throw new Error('Monto inválido.')
 
-  const items = await prisma.importItem.findMany({ where: { importId }, orderBy: { itemCode: 'asc' } })
+  const items = await prisma.importItem.findMany({
+    where: { importId },
+    orderBy: { itemCode: 'asc' },
+  })
 
   await prisma.$transaction(async (tx) => {
     const expense = await tx.importExpense.create({
@@ -168,24 +273,46 @@ export async function createExpenseAction(importId: string, formData: FormData) 
     })
 
     if (prorationMethod === 'MANUAL') {
-      const manualAllocations = manualJson ? (JSON.parse(manualJson) as Array<{ itemCode: string; amountUsd: number }>) : []
+      const manualAllocations = manualJson
+        ? (JSON.parse(manualJson) as Array<{ itemCode: string; amountUsd: number }>)
+        : []
+
       const allocations = manualAllocations
         .map((row) => {
           const item = items.find((it) => it.itemCode === row.itemCode)
-          return item ? { importItemId: item.id, amountUsd: Number(row.amountUsd || 0), allocationPct: amountUsd > 0 ? Number((Number(row.amountUsd || 0) / amountUsd).toFixed(6)) : 0 } : null
+          return item
+            ? {
+                importItemId: item.id,
+                amountUsd: Number(row.amountUsd || 0),
+                allocationPct:
+                  amountUsd > 0 ? Number((Number(row.amountUsd || 0) / amountUsd).toFixed(6)) : 0,
+              }
+            : null
         })
-        .filter(Boolean) as Array<{ importItemId: string; amountUsd: number; allocationPct: number }>
+        .filter(Boolean) as Array<{
+        importItemId: string
+        amountUsd: number
+        allocationPct: number
+      }>
 
       if (allocations.length) {
         await tx.importExpenseAllocation.createMany({
-          data: allocations.map((a) => ({ ...a, expenseId: expense.id, isManual: true })),
+          data: allocations.map((a) => ({
+            ...a,
+            expenseId: expense.id,
+            isManual: true,
+          })),
         })
       }
     } else {
       const allocations = buildAutoAllocations(items, amountUsd, prorationMethod)
       if (allocations.length) {
         await tx.importExpenseAllocation.createMany({
-          data: allocations.map((a) => ({ ...a, expenseId: expense.id, isManual: false })),
+          data: allocations.map((a) => ({
+            ...a,
+            expenseId: expense.id,
+            isManual: false,
+          })),
         })
       }
     }
@@ -202,15 +329,24 @@ export async function deleteExpenseAction(importId: string, expenseId: string) {
   revalidatePath(`/importaciones/${importId}`)
 }
 
-export async function saveItemProductionAction(importId: string, itemId: string, formData: FormData) {
+export async function saveItemProductionAction(
+  importId: string,
+  itemId: string,
+  formData: FormData
+) {
   const producedUnits = Math.trunc(parseNumber(formData.get('producedUnits')))
   const defectiveUnits = Math.trunc(parseNumber(formData.get('defectiveUnits')))
   const grammageValue = parseNumber(formData.get('grammageValue'))
   const grammageUnit = String(formData.get('grammageUnit') || 'KG') as 'GRAMOS' | 'KG'
-  const unitsPerBundle = formData.get('unitsPerBundle') ? Math.trunc(parseNumber(formData.get('unitsPerBundle'))) : null
-  const bundleCount = formData.get('bundleCount') ? Math.trunc(parseNumber(formData.get('bundleCount'))) : null
+  const unitsPerBundle = formData.get('unitsPerBundle')
+    ? Math.trunc(parseNumber(formData.get('unitsPerBundle')))
+    : null
+  const bundleCount = formData.get('bundleCount')
+    ? Math.trunc(parseNumber(formData.get('bundleCount')))
+    : null
   const manualWasteAdjustmentKg = parseNumber(formData.get('manualWasteAdjustmentKg'))
-  const wasteAdjustmentReason = String(formData.get('wasteAdjustmentReason') || '').trim() || null
+  const wasteAdjustmentReason =
+    String(formData.get('wasteAdjustmentReason') || '').trim() || null
   const notes = String(formData.get('notes') || '').trim() || null
 
   const item = await prisma.importItem.findUnique({ where: { id: itemId } })
@@ -268,4 +404,5 @@ export async function saveItemProductionAction(importId: string, itemId: string,
 
   await recalculateAndSnapshot(importId, `Producción actualizada para ítem ${item.itemCode}`)
   revalidatePath(`/importaciones/${importId}`)
+  redirect(`/importaciones/${importId}`)
 }
