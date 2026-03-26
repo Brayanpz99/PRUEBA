@@ -21,7 +21,7 @@ type ItemFormRowProps = {
   item?: {
     itemCode: string
     description: string
-    quantity: number
+    quantity: unknown
     unit: string
     unitPriceUsd: unknown
     netWeightKg: unknown
@@ -52,7 +52,7 @@ function ItemFormRow({ item }: ItemFormRowProps) {
           step="0.01"
           min="0"
           placeholder="Cantidad"
-          defaultValue={item?.quantity ?? 0}
+          defaultValue={item ? Number(item.quantity) : 0}
           className={inputClass}
         />
         <select

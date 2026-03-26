@@ -65,6 +65,12 @@ model Import {
   currency                String          @default("USD")
   freightUsd              Decimal         @default(0) @db.Decimal(14, 2)
   freightProrationMethod  ProrationMethod @default(POR_VALOR)
+  daiNumber               String?
+  daiDate                 DateTime?
+  insurancePolicyNumber   String?
+  insuranceCompany        String?
+  insuranceIssuedAt       DateTime?
+  insuranceExpiresAt      DateTime?
   notes                   String?
   status                  ImportStatus    @default(ACTIVE)
 
